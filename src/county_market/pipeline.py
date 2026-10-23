@@ -147,11 +147,23 @@ class CountyMap:
 
 class Pipeline:
     def __init__(self, cfg: Config, logger: logging.Logger | None = None):
+        import sys
         self.cfg, self.log = cfg, logger or logging.getLogger("county_market")
+        if not self.log.handlers:
+            h = logging.StreamHandler(sys.stdout)
+            h.setFormatter(logging.Formatter("%(asctime)s  %(levelname)-7s %(message)s", "%H:%M:%S"))
+            self.log.addHandler(h)
+            self.log.setLevel(logging.INFO)
 
     def run(self, run_label: str | None = None) -> Result:
+        import io
+
         import matplotlib.pyplot as plt
 
+        buf = io.StringIO()
+        cap = logging.StreamHandler(buf)
+        cap.setFormatter(logging.Formatter("%(asctime)s  %(levelname)-7s %(message)s", "%H:%M:%S"))
+        self.log.addHandler(cap)
         t0 = time.perf_counter()
         L = Loader()
         rows, end = L.snapshot(self.cfg.period_end)
@@ -169,7 +181,7 @@ class Pipeline:
         run_dir = self.cfg.output_dir / (run_label or end)
         label = pd.Timestamp(end).strftime("%B %Y")
         painter = CountyMap(self.cfg, edges, label)
-        maps, summary = [], []
+        maps, summary, failed = [], [], []
         for area in self.cfg.areas:
             za = z[z["county"] == area].copy()
             if za.empty:
@@ -177,7 +189,12 @@ class Pipeline:
                 continue
             county = L.counties.to_crs(CRS_AREA)
             county = county[county["NAME"] == area]
-            maps.append(painter.draw(area, za, county, run_dir / "maps" / f"{area.lower().replace(' ', '_')}.png", cmap, set()))
+            try:
+                maps.append(painter.draw(area, za, county, run_dir / "maps" / f"{area.lower().replace(' ', '_')}.png", cmap, set()))
+            except Exception as exc:                       # one bad area must not stop the batch
+                failed.append(area)
+                self.log.error("%s: failed (%s)", area, exc)
+                continue
             g = za[~za["flag"]]
             w = g["homes_sold"]
             summary.append({"area": area, "zips_total": len(za), "zips_mapped": len(g), "zips_flagged": int(za["flag"].sum()),
@@ -190,7 +207,10 @@ class Pipeline:
         changes = self._changes(S, run_dir)
         changes.to_csv(run_dir / "changes_vs_previous.csv", index=False)
         secs = time.perf_counter() - t0
-        self.log.info("done: %d maps, %d QA exceptions, %d changed rows vs previous run, %.1f s -> %s", len(maps), len(qa), len(changes), secs, run_dir)
+        self.log.info("done: %d areas processed, %d failed, %d maps, %d QA exceptions, %d changed rows vs previous run, %.1f s -> %s",
+                      len(maps), len(failed), len(maps), len(qa), len(changes), secs, run_dir)
+        (run_dir / "run.log").write_text(buf.getvalue())
+        self.log.removeHandler(cap)
         return Result(run_dir, secs, S, qa, changes, maps)
 
     def _changes(self, S: pd.DataFrame, run_dir: Path) -> pd.DataFrame:

@@ -1,12 +1,12 @@
-04:45:36  INFO    loaded 38828 market rows, 229 ZIP polygons, 254 counties; period ending 2026-05-31
-04:45:36  INFO    spatial join: 229 ZIP polygons assigned to counties
-04:45:36  INFO    QA: 37 exceptions across 2 checks
-04:45:36  INFO    Harris      130 ZIPs  125 mapped   5 flagged  -> harris.png
-04:45:37  INFO    Fort Bend    16 ZIPs   16 mapped   0 flagged  -> fort_bend.png
-04:45:37  INFO    Montgomery   21 ZIPs   21 mapped   0 flagged  -> montgomery.png
-04:45:37  INFO    Brazoria     15 ZIPs   12 mapped   3 flagged  -> brazoria.png
-04:45:38  INFO    Galveston    16 ZIPs   15 mapped   1 flagged  -> galveston.png
-04:45:38  INFO    Waller        3 ZIPs    3 mapped   0 flagged  -> waller.png
-04:45:38  INFO    Liberty       6 ZIPs    3 mapped   3 flagged  -> liberty.png
-04:45:38  INFO    Chambers      4 ZIPs    3 mapped   1 flagged  -> chambers.png
-04:45:38  INFO    done: 8 maps, 37 QA exceptions, 8 changed rows vs previous run, 2.6 s -> /home/user/gis-automation/outputs/runs/2026-05-31
+05:09:19  INFO    loaded 38828 market rows, 229 ZIP polygons, 254 counties; period ending 2026-05-31
+05:09:19  INFO    spatial join: 229 ZIP polygons assigned to counties
+05:09:19  INFO    QA: 37 exceptions across 2 checks
+05:09:19  INFO    Harris      130 ZIPs  125 mapped   5 flagged  -> harris.png
+05:09:19  INFO    Fort Bend    16 ZIPs   16 mapped   0 flagged  -> fort_bend.png
+05:09:20  INFO    Montgomery   21 ZIPs   21 mapped   0 flagged  -> montgomery.png
+05:09:20  INFO    Brazoria     15 ZIPs   12 mapped   3 flagged  -> brazoria.png
+05:09:20  INFO    Galveston    16 ZIPs   15 mapped   1 flagged  -> galveston.png
+05:09:20  INFO    Waller        3 ZIPs    3 mapped   0 flagged  -> waller.png
+05:09:21  INFO    Liberty       6 ZIPs    3 mapped   3 flagged  -> liberty.png
+05:09:21  INFO    Chambers      4 ZIPs    3 mapped   1 flagged  -> chambers.png
+05:09:21  INFO    done: 8 areas processed, 0 failed, 8 maps, 37 QA exceptions, 8 changed rows vs previous run, 2.4 s -> /home/user/gis-automation/outputs/runs/2026-05-31
