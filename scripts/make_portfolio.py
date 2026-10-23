@@ -45,6 +45,7 @@ def canvas(eyebrow, title, sub, bg=PAPER):
     ax.text(1.0, 12.3, eyebrow.upper(), fontsize=15, fontweight="bold", color=TEAL, va="center")
     ax.text(1.0, 11.45, title, fontsize=39, fontweight="bold", color=NAVY, va="center")
     ax.text(1.0, 10.6, sub, fontsize=19, color=MUTED, va="center")
+    ax.text(1.0, 0.25, "Data: Redfin Data Center ZIP-code market tracker (public, rolling 3-month windows); Census 2010 ZIP Code Tabulation Areas and county outlines (public mirrors on GitHub). Home-price figures are Redfin's, not mine.", fontsize=11, color=FAINT if bg == PAPER else "#6B7C93", va="center")
     ax.text(W - 1.0, 0.6, "Matt Powell  ·  GIS automation", fontsize=14, color=FAINT, ha="right", va="center")
     return fig, ax
 
