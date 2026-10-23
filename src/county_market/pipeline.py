@@ -118,6 +118,7 @@ class CountyMap:
         from matplotlib.patches import Patch
 
         plt.rcParams["text.parse_math"] = False
+        plt.rcParams["font.family"] = ["Liberation Sans", "DejaVu Sans"]
         fig = plt.figure(figsize=(10, 6.4), dpi=150)
         ax = fig.add_axes([0.02, 0.09, 0.63, 0.74])
         fig.patch.set_facecolor("#FBFAF7")

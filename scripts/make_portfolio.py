@@ -1,9 +1,9 @@
-"""Builds the portfolio graphics from a real run. Labels are typed; every number (times, counts, changes, log lines, code) is read from the run's files."""
+"""Builds the portfolio graphics from a real run. Typed text is limited to labels; numbers, log lines, file listings, table rows and code are read from the run's files."""
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
-import textwrap
 from pathlib import Path
 
 import matplotlib
@@ -11,281 +11,220 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-from matplotlib.patches import Circle, FancyArrowPatch, FancyBboxPatch, Rectangle
+from matplotlib.patches import Rectangle
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from county_market.pipeline import Config  # noqa: E402
 
 OUT = ROOT / "outputs" / "portfolio"
-NAVY, INK, MUTED, FAINT = "#0B2540", "#1B2430", "#5C6773", "#98A1AB"
-TEAL, TEAL_L, AMBER, AMBER_L, RED, PAPER, LINE = "#0F766E", "#E6F4F1", "#B45309", "#FEF3E2", "#B42318", "#F4F6F8", "#D9DEE4"
+INK, MUTED, FAINT, RULE, BLUE, RUST = "#111111", "#555555", "#8A8A8A", "#CFCFCF", "#1F4E79", "#9A3B12"
 W, H = 24, 13.5
-plt.rcParams.update({"font.family": "Inter", "text.parse_math": False})
-MONO = "DejaVu Sans Mono"
+SANS, MONO = "Liberation Sans", "Liberation Mono"
+plt.rcParams.update({"font.family": SANS, "text.parse_math": False})
+SOURCE = "Data: Redfin Data Center ZIP-code market tracker (public); Census 2010 ZIP Code Tabulation Areas and county outlines (public mirrors on GitHub)."
 
 
 def facts():
     d = sorted((ROOT / "outputs" / "runs").glob("*/run.log"))[-1].parent
     log = (d / "run.log").read_text()
-    secs = float(re.search(r"([\d.]+) s ->", log).group(1))
-    failed = int(re.search(r"(\d+) failed", log).group(1))
     cfg = Config.load(ROOT / "config" / "pipeline.toml")
     S = pd.read_csv(d / "summary.csv")
-    return dict(dir=d, log=log, secs=secs, failed=failed, qa=pd.read_csv(d / "qa_exceptions.csv"), ch=pd.read_csv(d / "changes_vs_previous.csv"), S=S, cfg=cfg, n=len(S),
-                manual=cfg.manual_minutes_per_area * len(S), zips=int(S["zips_total"].sum()), period=d.name)
+    return dict(dir=d, log=log, secs=float(re.search(r"([\d.]+) s ->", log).group(1)), failed=int(re.search(r"(\d+) failed", log).group(1)), qa=pd.read_csv(d / "qa_exceptions.csv"),
+                ch=pd.read_csv(d / "changes_vs_previous.csv"), S=S, cfg=cfg, n=len(S), manual=cfg.manual_minutes_per_area * len(S), period=d.name)
 
 
-def canvas(eyebrow, title, sub, bg=PAPER):
+def page(title, sub, bg="white", ink=INK, muted=MUTED):
     fig = plt.figure(figsize=(W, H), dpi=100, facecolor=bg)
     ax = fig.add_axes((0, 0, 1, 1)); ax.set_xlim(0, W); ax.set_ylim(0, H); ax.set_axis_off()
-    ax.add_patch(Rectangle((0, H - 0.22), W, 0.22, fc=TEAL, ec="none"))
-    ax.text(1.0, 12.3, eyebrow.upper(), fontsize=15, fontweight="bold", color=TEAL, va="center")
-    ax.text(1.0, 11.45, title, fontsize=39, fontweight="bold", color=NAVY, va="center")
-    ax.text(1.0, 10.6, sub, fontsize=19, color=MUTED, va="center")
-    ax.text(1.0, 0.25, "Data: Redfin Data Center ZIP-code market tracker (public, rolling 3-month windows); Census 2010 ZIP Code Tabulation Areas and county outlines (public mirrors on GitHub). Home-price figures are Redfin's, not mine.", fontsize=11, color=FAINT if bg == PAPER else "#6B7C93", va="center")
-    ax.text(W - 1.0, 0.6, "Matt Powell  ·  GIS automation", fontsize=14, color=FAINT, ha="right", va="center")
+    ax.text(1.2, 12.3, title, fontsize=34, fontweight="bold", color=ink, va="center")
+    ax.text(1.2, 11.5, sub, fontsize=17, color=muted, va="center")
+    ax.plot([1.2, W - 1.2], [10.95, 10.95], color=ink, lw=1.4)
+    ax.text(1.2, 0.55, SOURCE, fontsize=11, color=FAINT if bg == "white" else "#7C8794", va="center")
+    ax.text(W - 1.2, 0.55, "Matt Powell", fontsize=11, color=FAINT if bg == "white" else "#7C8794", va="center", ha="right")
     return fig, ax
 
 
-def card(ax, x, y, w, h, fc="white", ec=LINE, r=0.25, shadow=True):
-    if shadow:
-        ax.add_patch(FancyBboxPatch((x + 0.07, y - 0.09), w, h, boxstyle=f"round,pad=0.0,rounding_size={r}", fc="#0B2540", ec="none", alpha=0.07, zorder=1))
-    ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle=f"round,pad=0.0,rounding_size={r}", fc=fc, ec=ec, lw=1.6, zorder=2))
+def label(ax, x, y, t, c=MUTED, fs=12.5):
+    ax.text(x, y, t.upper(), fontsize=fs, color=c, fontweight="bold", va="center")
 
 
-def arrow(ax, p, q, color=MUTED, lw=2.6, style="-|>", rad=0.0):
-    ax.add_patch(FancyArrowPatch(p, q, arrowstyle=style, mutation_scale=22, lw=lw, color=color, connectionstyle=f"arc3,rad={rad}", zorder=4))
-
-
-def thumb(ax, path, x, y, w, border=LINE, shadow=True):
+def shot(ax, path, x, y, w):
     im = mpimg.imread(path)
     h = w * im.shape[0] / im.shape[1]
-    card(ax, x, y, w, h, fc="white", ec=border, r=0.12, shadow=shadow)
-    ax.imshow(im, extent=(x + 0.05, x + w - 0.05, y + 0.05, y + h - 0.05), zorder=3, aspect="auto")
+    ax.add_patch(Rectangle((x, y), w, h, fc="white", ec=RULE, lw=1.2, zorder=2))
+    ax.imshow(im, extent=(x, x + w, y, y + h), zorder=3, aspect="auto")
     return h
 
 
-def badge(ax, x, y, t, fc=NAVY, r=0.3, fs=17):
-    ax.add_patch(Circle((x, y), r, fc=fc, ec="none", zorder=5))
-    ax.text(x, y, t, fontsize=fs, color="white", fontweight="bold", ha="center", va="center", zorder=6)
+def sh(cmd):
+    return subprocess.run(cmd, shell=True, cwd=ROOT, capture_output=True, text=True).stdout.rstrip("\n")
 
 
-def chip(ax, x, y, text, fc=TEAL_L, color=TEAL, fs=15, pad=0.35):
-    w = len(text) * fs * 0.0128 + pad * 2
-    ax.add_patch(FancyBboxPatch((x, y - 0.3), w, 0.6, boxstyle="round,pad=0,rounding_size=0.3", fc=fc, ec="none", zorder=3))
-    ax.text(x + w / 2, y, text, fontsize=fs, color=color, fontweight="bold", ha="center", va="center", zorder=4)
-    return w
-
-
-# ---------------------------------------------------------------- 1 before / after
+# 1 -------------------------------------------------------------- manual vs scripted
 def before_after(f):
-    fig, ax = canvas("Workflow", "Before / after", f"Monthly market maps for {f['n']} Houston-area counties: from a manual routine to one command")
-    card(ax, 1.0, 1.7, 10.3, 8.4, fc="white")
-    ax.add_patch(Rectangle((1.0, 9.2), 10.3, 0.9, fc=AMBER_L, ec="none", zorder=2))
-    ax.text(1.5, 9.65, "THE MANUAL WAY  (desktop GIS)", fontsize=17, fontweight="bold", color=AMBER, va="center", zorder=5)
-    steps = ["Open the GIS project", "Load ZIP, county and market data", "Run spatial join", "Check for errors", "Export map", f"Repeat for the next county  (× {f['n']})"]
-    y = 8.35
+    fig, ax = page("Monthly county market maps: by hand vs scripted", f"{f['n']} Houston-area counties, one consistently styled map each, plus a QA report and a change log")
+    label(ax, 1.2, 10.2, "By hand, in a desktop GIS")
+    steps = ["Open the project", "Load the ZIP, county and market layers", "Run the spatial join", "Check for errors (thin sales, missing polygons)", "Export the map", f"Repeat for the next county ({f['n']} times)"]
+    y = 9.3
     for i, t in enumerate(steps):
-        badge(ax, 1.9, y, str(i + 1), fc=AMBER, r=0.27, fs=15)
-        ax.text(2.5, y, t, fontsize=19, color=INK, va="center", zorder=5)
-        if i < len(steps) - 1:
-            ax.plot([1.9, 1.9], [y - 0.32, y - 0.73], color=AMBER, lw=2.2, alpha=0.5, zorder=3)
-        y -= 1.05
-    arrow(ax, (10.7, 3.3), (10.7, 7.9), color=AMBER, lw=2, rad=-0.35)
-    ax.text(1.5, 2.25, f"≈ {f['manual']:.0f} min per run", fontsize=30, fontweight="bold", color=AMBER, va="center", zorder=5)
-    ax.text(8.5, 2.25, "every month", fontsize=15, color=MUTED, va="center", ha="right", zorder=5)
-    card(ax, 12.7, 1.7, 10.3, 8.4, fc="white")
-    ax.add_patch(Rectangle((12.7, 9.2), 10.3, 0.9, fc=TEAL_L, ec="none", zorder=2))
-    ax.text(13.2, 9.65, "WITH THE SCRIPT", fontsize=17, fontweight="bold", color=TEAL, va="center", zorder=5)
-    card(ax, 13.4, 7.4, 8.9, 1.3, fc=NAVY, ec=NAVY, r=0.2, shadow=False)
-    ax.text(17.85, 8.05, "Run script", fontsize=28, fontweight="bold", color="white", ha="center", va="center", zorder=6)
-    arrow(ax, (17.85, 7.3), (17.85, 6.75), color=TEAL, lw=3.5)
-    card(ax, 13.4, 5.4, 8.9, 1.25, fc=TEAL, ec=TEAL, r=0.2, shadow=False)
-    ax.text(17.85, 6.02, "Done", fontsize=30, fontweight="bold", color="white", ha="center", va="center", zorder=6)
-    names = ["harris", "fort_bend", "montgomery", "galveston"]
-    for i, n in enumerate(names):
-        thumb(ax, f["dir"] / "maps" / f"{n}.png", 13.4 + i * 2.28, 3.55, 2.1, shadow=False)
-    ax.text(13.4, 3.2, f"{f['n']} maps, same classes and layout", fontsize=14, color=MUTED, va="center", zorder=5)
-    ax.text(13.4, 2.25, f"{f['secs']:.1f} seconds", fontsize=30, fontweight="bold", color=TEAL, va="center", zorder=5)
-    ax.text(22.5, 2.25, "measured", fontsize=15, color=MUTED, va="center", ha="right", zorder=5)
-    ax.text(1.0, 1.0, f"The {f['manual']:.0f}-minute figure is an assumption ({f['cfg'].manual_minutes_per_area:g} min per county, set in config/pipeline.toml); the {f['secs']:.1f} s is timed on this run.", fontsize=14, color=MUTED, va="center")
-    fig.savefig(OUT / "1_before_after.png", facecolor=PAPER); plt.close(fig)
+        ax.text(1.2, y, f"{i + 1}.", fontsize=19, color=MUTED, va="center")
+        ax.text(2.0, y, t, fontsize=19, color=INK, va="center")
+        y -= 0.95
+    ax.plot([1.2, 11.0], [3.35, 3.35], color=RULE, lw=1)
+    ax.text(1.2, 2.7, f"about {f['manual']:.0f} minutes per run", fontsize=26, fontweight="bold", color=RUST, va="center")
+    ax.text(1.2, 2.05, f"Estimate: {f['cfg'].manual_minutes_per_area:g} minutes per county × {f['n']}. Not a timed measurement.", fontsize=13, color=MUTED, va="center")
+    ax.plot([12.0, 12.0], [2.0, 10.2], color=RULE, lw=1)
+    label(ax, 13.0, 10.2, "Scripted")
+    ax.text(13.0, 9.3, "python examples/run_monthly.py", fontsize=19, family=MONO, color=INK, va="center")
+    ax.plot([13.0, 22.8], [8.7, 8.7], color=RULE, lw=1)
+    ax.text(13.0, 8.15, f"what it writes (outputs/runs/{f['period']}/):", fontsize=14, color=MUTED, va="center")
+    listing = sh(f"ls -1 outputs/runs/{f['period']}")
+    y = 7.55
+    for ln in listing.splitlines():
+        ax.text(13.0, y, ln, fontsize=14.5, family=MONO, color=INK, va="center")
+        y -= 0.5
+    for i, n in enumerate(["harris", "fort_bend", "montgomery"]):
+        shot(ax, f["dir"] / "maps" / f"{n}.png", 13.0 + i * 3.35, 2.7, 3.2)
+    ax.text(13.0, 2.05, f"{f['secs']:.1f} seconds, timed on this run", fontsize=26, fontweight="bold", color=BLUE, va="center")
+    fig.savefig(OUT / "1_before_after.png", facecolor="white"); plt.close(fig)
 
 
-# ---------------------------------------------------------------- 2 terminal
+# 2 -------------------------------------------------------------- terminal
 def terminal(f):
-    BG = "#0B1220"
-    fig, ax = canvas("Run log", f"Automated monthly export: {f['n']} county market maps", "Timestamped log with per-area status and a summary, written to run.log on every run", bg=BG)
-    ax.texts[1].set_color("white"); ax.texts[2].set_color("white"); ax.texts[3].set_color("#9FB0C3"); ax.texts[0].set_color("#5EEAD4")
-    ax.patches[0].set_facecolor("#14B8A6")
-    stats = [(f"{f['n']}", "areas"), (f"{f['zips']}", "ZIP areas"), (f"{len(f['qa'])}", "flagged"), (f"{f['failed']}", "failed"), (f"{f['secs']:.1f} s", "total")]
-    for i, (v, l) in enumerate(stats):
-        x = 1.0 + i * 4.4
-        card(ax, x, 8.55, 4.1, 1.25, fc="#111A2B", ec="#233149", r=0.2, shadow=False)
-        ax.text(x + 0.35, 9.3, v, fontsize=27, fontweight="bold", color="white", va="center", zorder=6)
-        ax.text(x + 0.35, 8.88, l, fontsize=14, color="#9FB0C3", va="center", zorder=6)
-    card(ax, 1.0, 0.9, 22.0, 7.3, fc="#111A2B", ec="#233149", r=0.25, shadow=False)
-    ax.add_patch(Rectangle((1.0, 7.5), 22.0, 0.7, fc="#1A2740", ec="none", zorder=3))
-    for i, c in enumerate(("#FF5F56", "#FFBD2E", "#27C93F")):
-        ax.plot([1.6 + i * 0.5], [7.85], "o", ms=12, color=c, zorder=5)
-    ax.text(12, 7.85, "python examples/run_monthly.py", fontsize=15, color="#9FB0C3", ha="center", va="center", family=MONO, zorder=5)
-    y = 7.0
-    rel = lambda s: s.replace(str(ROOT) + "/", "")
-    for ln in f["log"].strip().splitlines():
-        ln = re.sub(r" -> .*$", "", rel(ln)) if "done:" in ln else rel(ln)
-        col = "#E6EDF3"
-        if " ERROR " in ln:
-            col = "#F87171"
-        elif "WARNING" in ln:
-            col = "#FBBF24"
-        elif "done:" in ln:
-            col = "#5EEAD4"
-        m = re.match(r"(\d\d:\d\d:\d\d)\s+(\w+)\s+(.*)", ln)
-        if m:
-            ax.text(1.5, y, m.group(1), fontsize=14.5, color="#6B7C93", family=MONO, va="center", zorder=5)
-            ax.text(3.7, y, m.group(2), fontsize=14.5, color="#5EEAD4" if m.group(2) == "INFO" else col, family=MONO, va="center", zorder=5)
-            body = m.group(3)
-            if len(body) > 118:
-                body = body[:116] + "…"
-            ax.text(5.1, y, body, fontsize=14.5, color=col, family=MONO, va="center", zorder=5)
-        y -= 0.52
+    BG = "#1C1C1C"
+    fig, ax = page(f"Automated monthly export: {f['n']} county market maps", "Terminal output from one real run, with the files it produced", bg=BG, ink="white", muted="#B5B5B5")
+    ax.plot([1.2, W - 1.2], [10.95, 10.95], color="#444444", lw=1.2)
+    p = f["period"]
+    blocks = [("$ python examples/run_monthly.py", f["log"].strip()),
+              (f"$ head -3 outputs/runs/{p}/qa_exceptions.csv", sh(f"head -3 outputs/runs/{p}/qa_exceptions.csv")),
+              (f"$ head -3 outputs/runs/{p}/changes_vs_previous.csv", sh(f"head -3 outputs/runs/{p}/changes_vs_previous.csv"))]
+    y = 10.3
+    for cmd, out in blocks:
+        ax.text(1.2, y, cmd, fontsize=13.5, family=MONO, color="#8FD18F", va="center")
+        y -= 0.42
+        for ln in out.splitlines():
+            ln = re.sub(r" -> .*$", "", ln.replace(str(ROOT) + "/", "")) if "done:" in ln else ln.replace(str(ROOT) + "/", "")
+            ax.text(1.2, y, ln, fontsize=13, family=MONO, color="#E6E6E6", va="center")
+            y -= 0.385
+        y -= 0.25
     fig.savefig(OUT / "2_terminal_run.png", facecolor=BG); plt.close(fig)
 
 
-# ---------------------------------------------------------------- 3 input vs output
+# 3 -------------------------------------------------------------- code vs maps
 def tokens(line):
     out, i = [], 0
-    kw = {"from", "import"}
     while i < len(line):
         ch = line[i]
         if ch == "#":
-            out.append((line[i:], "#7EE787")); break
+            out.append((line[i:], "#6A737D")); break
         if ch in "\"'":
             j = line.index(ch, i + 1) + 1
-            out.append((line[i:j], "#FDBA74")); i = j; continue
+            out.append((line[i:j], "#032F62")); i = j; continue
         m = re.match(r"[A-Za-z_]\w*", line[i:])
         if m:
             w = m.group(0)
-            col = "#79C0FF" if w in kw else ("#E6EDF3" if not w.isupper() else "#FDE68A")
-            out.append((w, col)); i += len(w); continue
-        out.append((ch, "#E6EDF3")); i += 1
+            out.append((w, "#B31D28" if w in {"from", "import"} else INK)); i += len(w); continue
+        out.append((ch, INK)); i += 1
     return out
 
 
 def input_output(f):
-    fig, ax = canvas("Configuration vs result", "You set a few variables. The script does the rest.", "Left: the real parameter file (examples/run_monthly.py). Right: maps from the same run.")
-    code = [l for l in (ROOT / "examples" / "run_monthly.py").read_text().splitlines()][1:]
-    code = [l for l in code if l.strip() != "" or True]
-    card(ax, 1.0, 1.3, 10.4, 8.8, fc="#0F172A", ec="#0F172A", r=0.3)
-    ax.add_patch(Rectangle((1.0, 9.35), 10.4, 0.75, fc="#16213A", ec="none", zorder=3))
-    for i, c in enumerate(("#FF5F56", "#FFBD2E", "#27C93F")):
-        ax.plot([1.6 + i * 0.5], [9.72], "o", ms=10, color=c, zorder=5)
-    ax.text(6.2, 9.72, "run_monthly.py", fontsize=13, color="#9FB0C3", ha="center", va="center", family=MONO, zorder=5)
-    y = 8.85
-    for ln in code:
-        x = 1.5
+    fig, ax = page("A few variables in, finished maps out", "Left: examples/run_monthly.py, the file you edit. Right: maps the same run produced.")
+    code = (ROOT / "examples" / "run_monthly.py").read_text().splitlines()[1:]
+    ax.add_patch(Rectangle((1.2, 1.3), 10.0, 9.2, fc="#F6F8FA", ec=RULE, lw=1.2))
+    ax.add_patch(Rectangle((1.2, 1.3), 0.9, 9.2, fc="#EDEFF2", ec="none"))
+    y = 10.0
+    for k, ln in enumerate(code, 1):
+        ax.text(2.0, y, str(k), fontsize=12, family=MONO, color=FAINT, ha="right", va="center")
+        x = 2.4
         for t, col in tokens(ln):
-            ax.text(x, y, t, fontsize=12.2, color=col, family=MONO, va="center", zorder=5)
+            ax.text(x, y, t, fontsize=12.2, family=MONO, color=col, va="center")
             x += len(t) * 0.1017
-        y -= 0.44 if ln.strip() else 0.24
-    arrow(ax, (11.7, 5.7), (12.9, 5.7), color=TEAL, lw=4)
-    ax.text(12.3, 6.25, "run", fontsize=15, color=TEAL, fontweight="bold", ha="center")
-    names = [("harris", "Harris"), ("fort_bend", "Fort Bend"), ("montgomery", "Montgomery"), ("galveston", "Galveston")]
-    tw = 4.85
-    for i, (n, label) in enumerate(names):
-        x0 = 13.2 + (i % 2) * (tw + 0.4)
+        y -= 0.5
+    for i, (n, nm) in enumerate([("harris", "harris.png"), ("fort_bend", "fort_bend.png"), ("montgomery", "montgomery.png"), ("galveston", "galveston.png")]):
+        x0 = 12.2 + (i % 2) * 5.75
         im = mpimg.imread(f["dir"] / "maps" / f"{n}.png")
-        th = tw * im.shape[0] / im.shape[1]
-        y0 = 9.9 - th - (i // 2) * (th + 0.45)
-        thumb(ax, f["dir"] / "maps" / f"{n}.png", x0, y0, tw)
-    w1 = chip(ax, 13.2, 1.55, f"+ {f['n'] - 4} more counties", fs=13)
-    chip(ax, 13.2 + w1 + 0.3, 1.55, "same classes on every map", fs=13, fc="#EEF2FF", color="#3730A3")
-    fig.savefig(OUT / "3_input_vs_output.png", facecolor=PAPER); plt.close(fig)
+        th = 5.4 * im.shape[0] / im.shape[1]
+        y0 = 10.5 - th - (i // 2) * (th + 0.75)
+        shot(ax, f["dir"] / "maps" / f"{n}.png", x0, y0, 5.4)
+        ax.text(x0, y0 - 0.28, nm, fontsize=12, family=MONO, color=MUTED, va="center")
+    fig.savefig(OUT / "3_input_vs_output.png", facecolor="white"); plt.close(fig)
 
 
-# ---------------------------------------------------------------- 4 what it replaced
+# 4 -------------------------------------------------------------- what it replaced
 def replaced(f):
     qa, ch, S = f["qa"], f["ch"], f["S"]
-    fig, ax = canvas("Outcomes", "What this script replaced", "Three routine tasks, and what each one produces now (all figures from one real run)")
-    ys = [7.2, 4.2, 1.2]
-    heads = [("Manual QA checks on every ZIP", "Automated validation with a flagged-exceptions report"),
-             (f"Exporting {f['n']} county maps one at a time", f"Batch export: {f['n']} identically styled maps in {f['secs']:.1f} s"),
-             ("Comparing this month with the last by eye", "Change log vs the previous run, per county")]
-    for (a, b), y in zip(heads, ys):
-        card(ax, 1.0, y, 22.0, 2.7, fc="white")
-        ax.add_patch(Rectangle((1.0, y + 0.3), 0.14, 2.1, fc=TEAL, ec="none", zorder=3))
-        ax.text(1.7, y + 1.95, "BEFORE", fontsize=12, fontweight="bold", color=AMBER, va="center", zorder=5)
-        ax.text(1.7, y + 1.3, textwrap.fill(a, 30), fontsize=19, color=INK, va="center", zorder=5, linespacing=1.25)
-        arrow(ax, (8.7, y + 1.35), (9.7, y + 1.35), color=TEAL, lw=3.5)
-        ax.text(10.1, y + 1.95, "NOW", fontsize=12, fontweight="bold", color=TEAL, va="center", zorder=5)
-        ax.text(10.1, y + 1.3, textwrap.fill(b, 34), fontsize=19, color=INK, va="center", zorder=5, linespacing=1.25, fontweight="bold")
-    # row 1 evidence: QA categories
+    fig, ax = page("What the script replaced", "Three routine tasks. Right-hand column: the evidence from one run.")
+    for x, t in zip([1.2, 8.0, 13.0], ["Done by hand", "Done by the script", f"From the run ({f['period']})"]):
+        label(ax, x, 10.4, t)
+    rows = [("Checking every ZIP for problems", "Validation rules; exceptions\nwritten to qa_exceptions.csv"),
+            (f"Exporting {f['n']} maps one at a time", f"One batch run, same classes\nand layout, {f['secs']:.1f} seconds"),
+            ("Comparing with last month by eye", "Change log against\nthe previous run")]
+    tops = [9.8, 6.9, 4.0]
+    for (a_, b_), t in zip(rows, tops):
+        ax.plot([1.2, W - 1.2], [t, t], color=RULE, lw=1)
+        ax.text(1.2, t - 0.85, a_, fontsize=17, color=INK, va="center")
+        ax.text(8.0, t - 0.85, b_, fontsize=17, color=INK, va="center", linespacing=1.35)
+    ax.plot([1.2, W - 1.2], [1.1, 1.1], color=RULE, lw=1)
     cnt = qa["check"].value_counts()
-    lab = {"thin_market": "thin market (< 10 sales)", "no_boundary": "no boundary polygon", "missing_value": "missing value", "split_zip": "split across counties"}
-    ev = fig.add_axes((17.0 / W, (ys[0] + 0.45) / H, 5.3 / W, 1.8 / H))
-    ev.barh([lab.get(k, k) for k in cnt.index[::-1]], cnt.values[::-1], color=AMBER, height=0.6)
-    for i, v in enumerate(cnt.values[::-1]):
-        ev.text(v, i, f" {v}", va="center", fontsize=13, color=INK, fontweight="bold")
-    ev.set_xlim(0, cnt.max() * 1.25); ev.tick_params(labelsize=12, length=0, colors=MUTED); ev.set_xticks([])
-    for sp in ev.spines.values():
-        sp.set_visible(False)
-    ev.set_facecolor("none")
-    ax.text(17.0, ys[0] + 2.5, f"{len(qa)} exceptions flagged, listed in qa_exceptions.csv", fontsize=13, color=MUTED, va="center", zorder=5)
-    # row 2 evidence: strip of all maps
-    sw = 0.95 * 1.0
-    names = list(S["area"])
-    for i, a in enumerate(names):
-        p = f["dir"] / "maps" / f"{a.lower().replace(' ', '_')}.png"
-        im = mpimg.imread(p)
-        w = 1.25; h = w * im.shape[0] / im.shape[1]
-        x0 = 17.0 + (i % 4) * 1.4; y0 = ys[1] + 1.35 - (i // 4) * 0.95
-        ax.add_patch(Rectangle((x0, y0), w, h * 0.78, fc="white", ec=LINE, lw=1, zorder=3))
-        ax.imshow(im[int(im.shape[0] * 0.14): int(im.shape[0] * 0.95), :int(im.shape[1] * 0.66)], extent=(x0 + 0.02, x0 + w - 0.02, y0 + 0.02, y0 + h * 0.78 - 0.02), zorder=4, aspect="auto")
-    # row 3 evidence: change bars
-    c = ch.sort_values("change_pct")
-    ev3 = fig.add_axes((17.0 / W, (ys[2] + 0.4) / H, 5.3 / W, 1.85 / H))
-    ev3.barh(c["area"], c["change_pct"], color=[TEAL if v >= 0 else AMBER for v in c["change_pct"]], height=0.65)
-    for i, v in enumerate(c["change_pct"]):
-        ev3.text(v + (0.12 if v >= 0 else -0.12), i, f"{v:+.1f}%", va="center", ha="left" if v >= 0 else "right", fontsize=11.5, color=INK, fontweight="bold")
-    ev3.axvline(0, color=INK, lw=0.8); ev3.set_xlim(c["change_pct"].min() - 2.2, c["change_pct"].max() + 2.4)
-    ev3.tick_params(labelsize=11, length=0, colors=MUTED); ev3.set_xticks([])
-    for sp in ev3.spines.values():
-        sp.set_visible(False)
-    ev3.set_facecolor("none")
-    ax.text(17.0, ys[2] + 2.5, f"sales-weighted median price vs {ch['previous_run'].iloc[0]}", fontsize=13, color=MUTED, va="center", zorder=5)
-    fig.savefig(OUT / "4_what_it_replaced.png", facecolor=PAPER); plt.close(fig)
+    nm = {"thin_market": "fewer than 10 sales", "no_boundary": "no boundary polygon", "missing_value": "missing value", "split_zip": "split across counties"}
+    ax.text(13.0, tops[0] - 0.55, f"{len(qa)} exceptions flagged", fontsize=15, fontweight="bold", color=INK, va="center")
+    for i, (k, v) in enumerate(cnt.items()):
+        ax.text(13.0, tops[0] - 1.2 - i * 0.45, nm.get(k, k), fontsize=14, color=INK, va="center")
+        ax.text(19.0, tops[0] - 1.2 - i * 0.45, f"{v}", fontsize=14, color=RUST, va="center", ha="right", family=MONO)
+    ax.text(13.0, tops[1] - 0.55, f"{f['n']} maps, {f['secs']:.1f} s", fontsize=15, fontweight="bold", color=INK, va="center")
+    for i, a_ in enumerate(S["area"]):
+        im = mpimg.imread(f["dir"] / "maps" / f"{a_.lower().replace(' ', '_')}.png")
+        im = im[int(0.14 * im.shape[0]): int(0.95 * im.shape[0]), : int(0.66 * im.shape[1])]
+        x0, y0 = 13.0 + i * 1.22, tops[1] - 2.1
+        ax.add_patch(Rectangle((x0, y0), 1.12, 0.95, fc="white", ec=RULE, lw=1, zorder=2))
+        ax.imshow(im, extent=(x0 + 0.02, x0 + 1.1, y0 + 0.02, y0 + 0.93), zorder=3, aspect="auto")
+    c = ch.sort_values("change_pct", ascending=False).reset_index(drop=True)
+    ax.text(13.0, tops[2] - 0.55, "Sales-weighted median price vs " + str(c["previous_run"].iloc[0]), fontsize=14, fontweight="bold", color=INK, va="center")
+    for i, r in c.iterrows():
+        x, y = 13.0 + (i // 4) * 5.4, tops[2] - 1.2 - (i % 4) * 0.4
+        ax.text(x, y, r["area"], fontsize=13.5, color=INK, va="center")
+        ax.text(x + 3.6, y, f"{r['change_pct']:+.1f}%", fontsize=13.5, color=BLUE if r["change_pct"] >= 0 else RUST, ha="right", va="center", family=MONO)
+    fig.savefig(OUT / "4_what_it_replaced.png", facecolor="white"); plt.close(fig)
 
 
-# ---------------------------------------------------------------- 5 monthly report
+# 5 -------------------------------------------------------------- the report as a document
 def report(f):
     S, ch = f["S"], f["ch"].set_index("area")
     col = [c for c in S.columns if c.endswith("_sales_weighted")][0]
-    fig, ax = canvas("Deliverable", "The monthly report, generated", f"3 months ending {pd.Timestamp(f['period']):%B %Y} · built from the run's files")
-    card(ax, 1.0, 1.4, 9.6, 8.7, fc="white")
-    ax.text(1.5, 9.5, "Median sale price by county", fontsize=19, fontweight="bold", color=NAVY, va="center", zorder=5)
-    ax.text(1.5, 9.0, "sales-weighted across mapped ZIPs · arrow = change vs previous run", fontsize=12.5, color=MUTED, va="center", zorder=5)
+    fig = plt.figure(figsize=(W, H), dpi=100, facecolor="#E4E6E9")
+    ax = fig.add_axes((0, 0, 1, 1)); ax.set_xlim(0, W); ax.set_ylim(0, H); ax.set_axis_off()
+    ax.text(1.2, 12.9, "Generated report (page 1 of 1)", fontsize=15, color=MUTED, va="center")
+    px, py, pw, ph = 4.2, 0.9, 15.6, 11.6
+    ax.add_patch(Rectangle((px + 0.12, py - 0.12), pw, ph, fc="#B8BCC2", ec="none"))
+    ax.add_patch(Rectangle((px, py), pw, ph, fc="white", ec="#C9CDD2", lw=1))
+    ax.text(px + 0.8, py + ph - 0.9, "County Market Snapshot", fontsize=27, fontweight="bold", color=INK, va="center")
+    ax.text(px + 0.8, py + ph - 1.6, f"Houston area · median sale price, 3 months ending {pd.Timestamp(f['period']):%B %-d, %Y}", fontsize=14, color=MUTED, va="center")
+    ax.plot([px + 0.8, px + pw - 0.8], [py + ph - 2.0, py + ph - 2.0], color=INK, lw=1.4)
+    hdr = ["County", "ZIPs", "Mapped", "Flagged", "Homes sold", "Median price", "vs prior"]
+    xs = [px + 0.8, px + 4.4, px + 5.7, px + 7.1, px + 8.7, px + 10.7, px + 12.4]
+    ys = py + ph - 2.55
+    for x, h in zip(xs, hdr):
+        ax.text(x if h == "County" else x + 1.1, ys, h, fontsize=11.5, color=MUTED, fontweight="bold", va="center", ha="left" if h == "County" else "right")
+    ax.plot([px + 0.8, px + pw - 0.8], [ys - 0.3, ys - 0.3], color=RULE, lw=1)
     T = S.sort_values(col, ascending=False).reset_index(drop=True)
-    mx = T[col].max()
     for i, r in T.iterrows():
-        y = 8.15 - i * 0.82
-        ax.text(1.5, y, r["area"], fontsize=15, color=INK, va="center", zorder=5)
-        bw = 4.4 * r[col] / mx
-        ax.add_patch(FancyBboxPatch((4.0, y - 0.22), bw, 0.44, boxstyle="round,pad=0,rounding_size=0.1", fc=TEAL, ec="none", alpha=0.9, zorder=4))
-        ax.text(4.0 + bw + 0.12, y, f"${r[col] / 1e3:,.0f}K", fontsize=13, color=INK, va="center", fontweight="bold", zorder=5)
-        pc = ch.loc[r["area"], "change_pct"]
-        ax.text(10.2, y, f"{'▲' if pc >= 0 else '▼'} {abs(pc):.1f}%", fontsize=13, color=TEAL if pc >= 0 else AMBER, va="center", ha="right", fontweight="bold", zorder=5)
-    th = thumb(ax, f["dir"] / "maps" / "harris.png", 11.2, 5.0, 11.8)
-    ax.text(11.2, 4.6, f"Harris County map, one of {f['n']} produced in the same run", fontsize=13, color=MUTED, va="center", zorder=5)
-    k = [(f"{f['zips']}", "ZIP areas processed"), (f"{int(S['zips_mapped'].sum())}", "mapped"), (f"{int(S['zips_flagged'].sum())}", "flagged for QA"), (f"{int(S['homes_sold'].sum()):,}", "home sales covered")]
-    for i, (v, l) in enumerate(k):
-        x = 11.2 + i * 3.0
-        card(ax, x, 1.4, 2.75, 2.5, fc="white")
-        ax.text(x + 0.3, 3.0, v, fontsize=28, fontweight="bold", color=NAVY, va="center", zorder=5)
-        ax.text(x + 0.3, 2.15, l, fontsize=12.5, color=MUTED, va="center", zorder=5)
-    fig.savefig(OUT / "5_monthly_report.png", facecolor=PAPER); plt.close(fig)
+        y = ys - 0.75 - i * 0.42
+        vals = [r["area"], f"{r['zips_total']}", f"{r['zips_mapped']}", f"{r['zips_flagged']}", f"{r['homes_sold']:,}", f"${r[col]:,.0f}", f"{ch.loc[r['area'], 'change_pct']:+.1f}%"]
+        for x, v, h in zip(xs, vals, hdr):
+            ax.text(x if h == "County" else x + 1.1, y, v, fontsize=13, color=INK, va="center", ha="left" if h == "County" else "right")
+    ytab = ys - 0.75 - 7 * 0.42 - 0.3
+    ax.plot([px + 0.8, px + pw - 0.8], [ytab, ytab], color=RULE, lw=1)
+    h = shot(ax, f["dir"] / "maps" / "harris.png", px + 0.8, py + 1.15, 5.6)
+    ax.text(px + 7.0, py + 1.15 + h - 0.2, "Notes", fontsize=13, fontweight="bold", color=INK, va="center")
+    notes = ["Prices are the sales-weighted mean of ZIP medians over mapped ZIPs.", "ZIPs with fewer than 10 sales are flagged and not mapped.",
+             "ZIP Code Tabulation Areas are 2010 shapes; ZIPs created since have no polygon.", "ZIPs are postal areas, not neighborhoods.", "Map: Harris County, same classes as the other seven."]
+    for i, t in enumerate(notes):
+        ax.text(px + 7.0, py + 1.15 + h - 0.8 - i * 0.62, "\n".join(__import__("textwrap").wrap(t, 52)), fontsize=11.5, color=MUTED, va="top", linespacing=1.3)
+    ax.text(px + 0.8, py + 0.55, SOURCE, fontsize=8.8, color=FAINT, va="center")
+    fig.savefig(OUT / "5_monthly_report.png", facecolor="#E4E6E9"); plt.close(fig)
 
 
 if __name__ == "__main__":

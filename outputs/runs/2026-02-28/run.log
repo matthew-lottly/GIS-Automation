@@ -1,12 +1,12 @@
-05:09:15  INFO    loaded 38828 market rows, 229 ZIP polygons, 254 counties; period ending 2026-02-28
-05:09:16  INFO    spatial join: 229 ZIP polygons assigned to counties
-05:09:16  INFO    QA: 39 exceptions across 3 checks
-05:09:16  INFO    Harris      129 ZIPs  121 mapped   8 flagged  -> harris.png
-05:09:16  INFO    Fort Bend    18 ZIPs   16 mapped   2 flagged  -> fort_bend.png
-05:09:16  INFO    Montgomery   22 ZIPs   21 mapped   1 flagged  -> montgomery.png
-05:09:17  INFO    Brazoria     15 ZIPs   12 mapped   3 flagged  -> brazoria.png
-05:09:17  INFO    Galveston    16 ZIPs   15 mapped   1 flagged  -> galveston.png
-05:09:17  INFO    Waller        3 ZIPs    3 mapped   0 flagged  -> waller.png
-05:09:17  INFO    Liberty       7 ZIPs    3 mapped   4 flagged  -> liberty.png
-05:09:18  INFO    Chambers      5 ZIPs    2 mapped   3 flagged  -> chambers.png
-05:09:18  INFO    done: 8 areas processed, 0 failed, 8 maps, 39 QA exceptions, 0 changed rows vs previous run, 2.4 s -> /home/user/gis-automation/outputs/runs/2026-02-28
+05:21:39  INFO    loaded 38828 market rows, 229 ZIP polygons, 254 counties; period ending 2026-02-28
+05:21:40  INFO    spatial join: 229 ZIP polygons assigned to counties
+05:21:40  INFO    QA: 39 exceptions across 3 checks
+05:21:40  INFO    Harris      129 ZIPs  121 mapped   8 flagged  -> harris.png
+05:21:40  INFO    Fort Bend    18 ZIPs   16 mapped   2 flagged  -> fort_bend.png
+05:21:41  INFO    Montgomery   22 ZIPs   21 mapped   1 flagged  -> montgomery.png
+05:21:41  INFO    Brazoria     15 ZIPs   12 mapped   3 flagged  -> brazoria.png
+05:21:41  INFO    Galveston    16 ZIPs   15 mapped   1 flagged  -> galveston.png
+05:21:42  INFO    Waller        3 ZIPs    3 mapped   0 flagged  -> waller.png
+05:21:42  INFO    Liberty       7 ZIPs    3 mapped   4 flagged  -> liberty.png
+05:21:42  INFO    Chambers      5 ZIPs    2 mapped   3 flagged  -> chambers.png
+05:21:42  INFO    done: 8 areas processed, 0 failed, 8 maps, 39 QA exceptions, 0 changed rows vs previous run, 3.3 s -> /home/user/gis-automation/outputs/runs/2026-02-28
