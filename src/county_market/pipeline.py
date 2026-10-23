@@ -203,6 +203,7 @@ class Pipeline:
             self.log.info("%-11s %3d ZIPs  %3d mapped  %2d flagged  -> %s", area, len(za), len(g), int(za["flag"].sum()), maps[-1].name)
         S = pd.DataFrame(summary)
         run_dir.mkdir(parents=True, exist_ok=True)
+        self._qa_map(asg.z, L.counties, z, qa, run_dir / "qa_map.png", label)
         S.to_csv(run_dir / "summary.csv", index=False)
         qa.to_csv(run_dir / "qa_exceptions.csv", index=False)
         changes = self._changes(S, run_dir)
@@ -213,6 +214,35 @@ class Pipeline:
         (run_dir / "run.log").write_text(buf.getvalue())
         self.log.removeHandler(cap)
         return Result(run_dir, secs, S, qa, changes, maps)
+
+    def _qa_map(self, all_zips, counties, z, qa, path: Path, label: str) -> None:
+        """Regional overview: where the flagged ZIPs are (thin markets in rust, other flags hatched)."""
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Patch
+
+        plt.rcParams["font.family"] = ["Liberation Sans", "DejaVu Sans"]
+        c = counties.to_crs(CRS_AREA)
+        c = c[c["NAME"].isin(self.cfg.areas)]
+        thin = set(qa.loc[qa["check"] == "thin_market", "zip"])
+        other = set(qa.loc[qa["check"].isin(["missing_value", "split_zip", "duplicate_row"]), "zip"]) - thin
+        zz = z.copy()
+        fig, ax = plt.subplots(figsize=(8, 6.4), dpi=150)
+        fig.patch.set_facecolor("white")
+        c.plot(ax=ax, fc="#F2F2F2", ec="#8A8A8A", lw=0.8)
+        zz[~zz["zip"].isin(thin | other)].plot(ax=ax, fc="#D6DBE1", ec="white", lw=0.4)
+        zz[zz["zip"].isin(thin)].plot(ax=ax, fc="#9A3B12", ec="white", lw=0.4)
+        if other:
+            zz[zz["zip"].isin(other)].plot(ax=ax, fc="#E4E6E9", ec="#9AA3AD", hatch="////", lw=0.3)
+        c.boundary.plot(ax=ax, color="#111111", lw=0.9)
+        x0, y0, x1, y1 = c.total_bounds
+        ax.set_xlim(x0 - 6000, x1 + 6000); ax.set_ylim(y0 - 6000, y1 + 6000); ax.set_aspect("equal"); ax.set_axis_off()
+        ax.legend(handles=[Patch(fc="#D6DBE1", label="mapped"), Patch(fc="#9A3B12", label=f"flagged: fewer than {self.cfg.min_sales} sales ({len(thin)})")] + ([Patch(fc="#E4E6E9", hatch="////", label=f"flagged: other ({len(other)})")] if other else []),
+                  loc="upper left", bbox_to_anchor=(0.0, 0.0), fontsize=9, frameon=False)
+        ax.set_title(f"ZIPs flagged by the QA checks, {label}", loc="left", fontsize=12, fontweight="bold")
+        fig.savefig(path, bbox_inches="tight")
+        plt.close(fig)
 
     def _changes(self, S: pd.DataFrame, run_dir: Path) -> pd.DataFrame:
         prev = sorted(p for p in self.cfg.output_dir.glob("*/summary.csv") if p.parent != run_dir and p.parent.name < run_dir.name)
