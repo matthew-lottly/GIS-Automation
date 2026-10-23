@@ -1,0 +1,11 @@
+# County market-map pipeline: the only file you edit between runs.
+[run]
+areas = ["Harris", "Fort Bend", "Montgomery", "Brazoria", "Galveston", "Waller", "Liberty", "Chambers"]
+metric = "median_sale_price"       # column in the market table
+period_end = "latest"              # or a date such as "2026-02-28"
+min_sales = 10                     # ZIPs with fewer sales are flagged, not mapped
+output_dir = "outputs/runs"
+
+[portfolio]
+# Used only for the portfolio graphics. This is an ASSUMPTION about doing the same job by hand, not a measurement.
+manual_minutes_per_area = 6

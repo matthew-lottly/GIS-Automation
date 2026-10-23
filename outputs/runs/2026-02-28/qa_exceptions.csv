@@ -1,0 +1,40 @@
+area,zip,check,detail
+Harris,77013,thin_market,7 sales < 10
+Harris,77031,thin_market,9 sales < 10
+Harris,77032,thin_market,9 sales < 10
+Harris,77037,thin_market,9 sales < 10
+Harris,77046,thin_market,3 sales < 10
+Harris,77050,thin_market,1 sales < 10
+Harris,77081,thin_market,9 sales < 10
+(no polygon),77097,no_boundary,ZIP is in the market table but has no polygon in the boundary file
+(no polygon),77097,thin_market,7 sales < 10
+(no polygon),77219,no_boundary,ZIP is in the market table but has no polygon in the boundary file
+(no polygon),77219,thin_market,1 sales < 10
+(no polygon),77244,no_boundary,ZIP is in the market table but has no polygon in the boundary file
+(no polygon),77244,thin_market,2 sales < 10
+(no polygon),77258,no_boundary,ZIP is in the market table but has no polygon in the boundary file
+(no polygon),77258,thin_market,1 sales < 10
+(no polygon),77266,no_boundary,ZIP is in the market table but has no polygon in the boundary file
+(no polygon),77266,thin_market,1 sales < 10
+(no polygon),77277,no_boundary,ZIP is in the market table but has no polygon in the boundary file
+(no polygon),77277,thin_market,3 sales < 10
+Liberty,77368,thin_market,1 sales < 10
+(no polygon),77410,no_boundary,ZIP is in the market table but has no polygon in the boundary file
+(no polygon),77410,thin_market,2 sales < 10
+Brazoria,77430,thin_market,5 sales < 10
+Fort Bend,77451,thin_market,1 sales < 10
+Fort Bend,77464,thin_market,1 sales < 10
+(no polygon),77496,no_boundary,ZIP is in the market table but has no polygon in the boundary file
+(no polygon),77496,thin_market,2 sales < 10
+Liberty,77533,thin_market,2 sales < 10
+Brazoria,77534,thin_market,9 sales < 10
+Liberty,77538,thin_market,1 sales < 10
+Harris,77547,thin_market,6 sales < 10
+Chambers,77560,thin_market,1 sales < 10
+Liberty,77564,thin_market,1 sales < 10
+Brazoria,77577,thin_market,1 sales < 10
+Chambers,77597,thin_market,1 sales < 10
+Galveston,77617,thin_market,5 sales < 10
+Chambers,77665,thin_market,6 sales < 10
+Montgomery,77873,thin_market,1 sales < 10
+Montgomery,77873,split_zip,only 44% of the ZIP lies in Montgomery

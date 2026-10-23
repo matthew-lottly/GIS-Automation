@@ -1,0 +1,12 @@
+04:45:33  INFO    loaded 38828 market rows, 229 ZIP polygons, 254 counties; period ending 2026-02-28
+04:45:33  INFO    spatial join: 229 ZIP polygons assigned to counties
+04:45:33  INFO    QA: 39 exceptions across 3 checks
+04:45:33  INFO    Harris      129 ZIPs  121 mapped   8 flagged  -> harris.png
+04:45:34  INFO    Fort Bend    18 ZIPs   16 mapped   2 flagged  -> fort_bend.png
+04:45:34  INFO    Montgomery   22 ZIPs   21 mapped   1 flagged  -> montgomery.png
+04:45:34  INFO    Brazoria     15 ZIPs   12 mapped   3 flagged  -> brazoria.png
+04:45:34  INFO    Galveston    16 ZIPs   15 mapped   1 flagged  -> galveston.png
+04:45:35  INFO    Waller        3 ZIPs    3 mapped   0 flagged  -> waller.png
+04:45:35  INFO    Liberty       7 ZIPs    3 mapped   4 flagged  -> liberty.png
+04:45:35  INFO    Chambers      5 ZIPs    2 mapped   3 flagged  -> chambers.png
+04:45:35  INFO    done: 8 maps, 39 QA exceptions, 0 changed rows vs previous run, 2.4 s -> /home/user/gis-automation/outputs/runs/2026-02-28

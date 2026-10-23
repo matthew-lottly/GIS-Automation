@@ -1,0 +1,9 @@
+area,zips_total,zips_mapped,zips_flagged,homes_sold,median_sale_price_sales_weighted
+Harris,129,121,8,9562,362599.0
+Fort Bend,18,16,2,2213,398861.0
+Montgomery,22,21,1,3060,344687.0
+Brazoria,15,12,3,1133,344827.0
+Galveston,16,15,1,1268,362083.0
+Waller,3,3,0,422,310878.0
+Liberty,7,3,4,256,296771.0
+Chambers,5,2,3,163,332419.0
